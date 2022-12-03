@@ -21,3 +21,8 @@ frontend/my-app/.env.production.local
 frontend/my-app/npm-debug.log*
 frontend/my-app/yarn-debug.log*
 frontend/my-app/yarn-error.log*
+
+backend/venv
+backend/database.db
+backend/.idea
+backend/__pycache__
