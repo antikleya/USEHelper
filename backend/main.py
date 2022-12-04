@@ -32,3 +32,8 @@ async def generate_token(
 @app.get("/api/users/me", response_model=_schemas.User)
 async def get_user(user: _schemas.User = _fastapi.Depends(_services.get_current_user)):
     return user
+
+
+@app.get("/api")
+async def root():
+    return {"Successful connect"}
