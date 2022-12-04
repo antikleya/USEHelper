@@ -13,7 +13,10 @@ async def create_user(user: _schemas.UserCreate, db: _orm.Session = _fastapi.Dep
     db_user = await _services.get_user_by_email(user.email, db)
     if db_user:
         raise _fastapi.HTTPException(status_code=400, detail="Email already is use")
-    return await _services.create_user(user, db)
+
+    user = await _services.create_user(user, db)
+
+    return await _services.cretae_token(user)
 
 
 @app.post("/api/token")
