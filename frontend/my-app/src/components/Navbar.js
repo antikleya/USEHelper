@@ -18,8 +18,8 @@ export const Navbar = () => {
         </ul>
   
         <div class="px-2 col-md-3 text-end">
-          <button href="/login" type="button" class="px-2 btn btn-primary" onClick={() => navigate('/login')}>Login</button>
-          <button href="/sighup" type="button" class="px-2 btn btn-primary" onClick={() => navigate('/registration')}>Sign-up</button>
+          <button href="/login" type="button" class="px-2 btn btn-outline-primary me-2" onClick={() => navigate('/login')}>Войти</button>
+          <button href="/sighup" type="button" class="px-2 btn btn-primary" onClick={() => navigate('/registration')}>Зарегистрироваться</button>
         </div>
       </header>
       </div>
