@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import "./Login.css";
+import { UserContext } from "../context/UserContext"
+import { useNavigate } from "react-router-dom";
 
 export const Registration = () => {
     const [email, setEmail] = useState('')
@@ -9,6 +11,7 @@ export const Registration = () => {
     const [emailError, setemailError] = useState('Email не может быть апустым')
     const [passwordError, setpasswordError] = useState('Пароль не может быть пустым')
     const [formValid, setFormValid] = useState(false)
+    const navigate = useNavigate()
 
     useEffect(() => {
         if (emailError || passwordError) {
@@ -52,9 +55,33 @@ export const Registration = () => {
         }
     }
 
+    const [,setToken] = useContext(UserContext)
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        submitRegistration();
+    }
+
+    const submitRegistration = async () => {
+        const requestOptions = {
+            method: "POST",
+            headers: {"Content-Type" : "application/json"},
+            body: JSON.stringify({email: email, hashed_password: password}) ,
+        };
+        const response = await fetch("/api/users", requestOptions);
+        const data = await response.json()
+
+        if (response.ok) {
+            setToken(data.access_token);
+            navigate("/subjects");
+        } else if (response.status==400) {
+            alert("Аккаунт с таким email уже существует")
+        }
+    };
+
     return(
         <h1>
-      <form className="loginForm">
+      <form className="loginForm" onSubmit={handleSubmit}>
         <h2>Регистрация</h2>
         <div>
         {(emailDirty && emailError) && <div style={{color: 'red'}}>{emailError}</div>}
@@ -83,7 +110,7 @@ export const Registration = () => {
           />
         </div>
         <div>
-          <button disabled={!formValid} className="blackBtn" type="submit">
+          <button disabled={!formValid} className="blackBtn" type="submit" >
             Создать аккаунт
           </button>
         </div>
