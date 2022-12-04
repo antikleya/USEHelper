@@ -1,5 +1,8 @@
 import "./Login.css";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { UserContext } from "../context/UserContext";
+
 
 export const Login = () => {
     const [email, setEmail] = useState('')
@@ -9,6 +12,13 @@ export const Login = () => {
     const [emailError, setemailError] = useState('Email не может быть апустым')
     const [passwordError, setpasswordError] = useState('Пароль не может быть пустым')
     const [formValid, setFormValid] = useState(false)
+    const navigate = useNavigate()
+    const [,setToken] = useContext(UserContext)
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        submitLogin();
+    }
 
     useEffect(() => {
         if (emailError || passwordError) {
@@ -51,9 +61,27 @@ export const Login = () => {
             setpasswordError('')
         }
     }
+
+    const submitLogin = async () => {
+        const requestOptions = {
+            method: "POST",
+            headers: {"Content-Type" : "application/x-www-form-urlencoded"},
+            body: JSON.stringify(`grant_type=&username=${email}&password=${password}&scope=&client_id=&client_secret=`) ,
+        };
+        const response = await fetch("/api/token", requestOptions);
+        const data = await response.json()
+
+        if (response.ok) {
+            setToken(data.access_token);
+            navigate("/subjects");
+        } else{
+            alert("Проверьте правильность данных")
+        }
+    };
+
     return (
     <h1>
-      <form className="loginForm">
+      <form className="loginForm" onSubmit={handleSubmit}>
         <h2>Авторизация</h2>
         <div>
         {(emailDirty && emailError) && <div style={{color: 'red'}}>{emailError}</div>}
@@ -90,3 +118,5 @@ export const Login = () => {
     </h1>
   );
 };
+
+export default Login;
