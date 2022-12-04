@@ -16,7 +16,7 @@ async def create_user(user: _schemas.UserCreate, db: _orm.Session = _fastapi.Dep
 
     user = await _services.create_user(user, db)
 
-    return await _services.cretae_token(user)
+    return await _services.create_token(user)
 
 
 @app.post("/api/token")
