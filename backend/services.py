@@ -36,7 +36,7 @@ async def get_user_by_email(email: str, db: _orm.Session):
 
 
 async def create_user(user: _schemas.UserCreate, db: _orm.Session):
-    user_obj = _models.User(email=user.email, hashed_password=_hash.bcrypt.hash(user.hashed_password))
+    user_obj = _models.User(email=user.email, name=user.name, hashed_password=_hash.bcrypt.hash(user.hashed_password))
     db.add(user_obj)
     db.commit()
     db.refresh(user_obj)
@@ -71,3 +71,53 @@ async def get_current_user(db: _orm.Session = _fastapi.Depends(get_db), token: s
         raise _fastapi.HTTPException(status_code=401, detail="Invalid Credentials")
 
     return _schemas.User.from_orm(user)
+
+
+async def get_users(db: _orm.Session):
+    users = db.query(_models.User).all()
+
+    return list(map(_schemas.User.from_orm, users))
+
+
+async def _user_selector(user_id: int, db: _orm.Session):
+    user = db.query(_models.User).filter_by(id=user_id).first()
+
+    if user is None:
+        raise _fastapi.HTTPException(status_code=404, detail="User does not exist")
+
+    return user
+
+
+async def _user_selector_change(user_id, db: _orm.Session, current_user: _schemas.User):
+    user = await _user_selector(user_id, db)
+
+    if user.id != current_user.id:
+        raise _fastapi.HTTPException(status_code=401, detail="Can't do that action to another user")
+
+    return user
+
+
+async def get_user(user_id: int, db: _orm.Session):
+    user = await _user_selector(user_id, db)
+
+    return _schemas.User.from_orm(user)
+
+
+async def delete_user(user_id: int, current_user: _schemas.User, db: _orm.Session):
+    user = await _user_selector_change(user_id, db, current_user)
+
+    db.delete(user)
+    db.commit()
+
+
+async def update_user(user_id: int, user: _schemas.UserCreate, current_user: _schemas.User, db: _orm.Session):
+    old_user = await _user_selector_change(user_id, db, current_user)
+
+    old_user.name = user.name
+    old_user.email = user.email
+    old_user.hashed_password = _hash.bcrypt.hash(user.hashed_password)
+
+    db.commit()
+    db.refresh(old_user)
+
+    return _schemas.User.from_orm(old_user)
