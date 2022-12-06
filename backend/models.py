@@ -28,7 +28,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     name = Column(String, default="")
     hashed_password = Column(String)
-    role_id = Column(Integer, ForeignKey("roles.id"))
+    role_id = Column(Integer, ForeignKey("roles.id"), default=1)
 
     role = relationship("Role", back_populates="users")
     tests = relationship("Test", back_populates="user")
@@ -106,5 +106,5 @@ class Answer(Base):
     question_id = Column(Integer, ForeignKey("questions.id"))
     test_id = Column(Integer, ForeignKey("tests.id"))
 
-    question = relationship("Question", back_populates="answer")
+    question = relationship("Question", back_populates="answers")
     test = relationship("Test", back_populates="answers")

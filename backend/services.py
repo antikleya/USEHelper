@@ -23,6 +23,14 @@ def get_db():
         db.close()
 
 
+def fill_database(db: _orm.Session = next(get_db())):
+    roles = ["user", "teacher", "administrator"]
+    for role in roles:
+        role_model = _models.Role(name=role)
+        db.add(role_model)
+        db.commit()
+
+
 async def get_user_by_email(email: str, db: _orm.Session):
     return db.query(_models.User).filter(_models.User.email == email).first()
 
