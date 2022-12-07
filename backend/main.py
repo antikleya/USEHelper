@@ -72,6 +72,46 @@ async def generate_token(
     return await _services.create_token(user)
 
 
-@app.get("/api")
-async def root():
-    return {"Successful connect"}
+# -------------------------Teacher-API----------------------------
+@app.post("/api/teachers")
+async def create_teacher(teacher: _schemas.TeacherCreate, db: _orm.Session = _fastapi.Depends(_services.get_db)):
+    teacher_db = await _services.get_teacher_by_phone(teacher.phone_number, db)
+    if teacher_db:
+        raise _fastapi.HTTPException(status_code=400, detail='This phone number is already in use')
+
+    teacher = await _services.create_teacher(teacher, db)
+
+    return _schemas.Teacher.from_orm(teacher)
+
+
+@app.get("/api/teachers", response_model=List[_schemas.Teacher])
+async def get_teachers(db: _orm.Session = _fastapi.Depends(_services.get_db)):
+    return await _services.get_teachers(db)
+
+
+@app.get("/api/teachers/{teacher_id}", status_code=200)
+async def get_teacher(teacher_id: int, db: _orm.Session = _fastapi.Depends(_services.get_db)):
+    return await _services.get_teacher(teacher_id, db)
+
+
+@app.delete("/api/teachers/{teacher_id}", status_code=204)
+async def delete_teacher(
+        teacher_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    await _services.delete_teacher(teacher_id, current_user, db)
+
+    return {"message", "Deleted Successfully"}
+
+
+@app.put("/api/teachers/{teacher_id}", status_code=200)
+async def update_teacher(
+        teacher_id: int,
+        teacher: _schemas.TeacherCreate,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    await _services.update_teacher(teacher_id, current_user, db, teacher)
+
+    return {"message", "Updated Successfully"}

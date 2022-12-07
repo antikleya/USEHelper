@@ -30,6 +30,14 @@ class _ThemeBase(_pydantic.BaseModel):
         orm_mode = True
 
 
+class _RoleBase(_pydantic.BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
 # -----------------------USER-MODELS-----------------------------------
 class UserCreate(_UserBase):
     hashed_password: str
@@ -37,6 +45,7 @@ class UserCreate(_UserBase):
 
 class User(_UserBase):
     id: int
+    role: _RoleBase
 
 
 # ------------------------TEACHER-MODELS------------------------------
