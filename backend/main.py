@@ -137,10 +137,10 @@ async def update_teacher(
 async def create_subject(
         subject: _schemas.SubjectCreate,
         db: _orm.Session = _fastapi.Depends(_services.get_db),
-        user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+#       user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    if not _services.is_admin(user):
-        raise _fastapi.HTTPException(status_code=401, detail='Must be an admin to perform this action')
+    # if not _services.is_admin(user):
+    #     raise _fastapi.HTTPException(status_code=401, detail='Must be an admin to perform this action')
 
     subject_db = await _services.get_subject_by_name(subject.name, db)
 
