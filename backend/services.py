@@ -197,4 +197,67 @@ async def update_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session,
     return _schemas.Teacher.from_orm(old_teacher)
 
 
+# ----------------------------SUBJECT-FUNCTIONS-------------------------------
+async def get_subject_by_name(subject_name: str, db: _orm.Session):
+    return db.query(_schemas.Subject).filter_by(name=subject_name).first()
+
+
+async def _subject_selector(subject_id: int, db: _orm.Session):
+    subject = db.query(_models.Subject).filter_by(id=subject_id).first()
+
+    if subject is None:
+        raise _fastapi.HTTPException(status_code=404, detail='Subject does not exist')
+
+    return subject
+
+
+async def _subject_selector_change(subject_id: int, db: _orm.Session, current_user: _schemas.User):
+    subject = await _subject_selector(subject_id, db)
+    user = await get_user_by_email(current_user.email, db)
+
+    if not is_admin(_schemas.User.from_orm(user)):
+        raise _fastapi.HTTPException(status_code=401, detail='Must be an admin to perform this action')
+
+    return subject
+
+
+async def create_subject(subject: _schemas.SubjectCreate, db: _orm.Session):
+    subject_obj = _models.Subject(name=subject.name)
+
+    db.add(subject_obj)
+    db.commit()
+    db.refresh(subject)
+
+    return subject_obj
+
+
+async def get_subjects(db: _orm.Session):
+    subjects = db.query(_models.Subject).all()
+
+    return list(map(_schemas.Subject.from_orm, subjects))
+
+
+async def get_subject(subject_id: int, db: _orm.Session):
+    subject = await _subject_selector(subject_id, db)
+
+    return _schemas.Subject.from_orm(subject)
+
+
+async def delete_subject(subject_id: int, db: _orm.Session, user: _schemas.User):
+    subject = await _subject_selector_change(subject_id, db, user)
+
+    db.delete(subject)
+    db.commit()
+
+
+async def update_subject(subject_id: int, db: _orm.Session, user: _schemas.User, subject: _schemas.SubjectCreate):
+    old_subject = await _subject_selector_change(subject_id, db, user)
+
+    old_subject.name = subject.name
+    old_subject.themes = subject.themes
+
+    db.commit()
+    db.refresh(old_subject)
+
+    return _schemas.Subject.from_orm(old_subject)
 

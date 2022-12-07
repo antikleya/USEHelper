@@ -38,6 +38,14 @@ class _RoleBase(_pydantic.BaseModel):
         orm_mode = True
 
 
+class _SubjectBase(_pydantic.BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
 # -----------------------USER-MODELS-----------------------------------
 class UserCreate(_UserBase):
     hashed_password: str
@@ -60,9 +68,19 @@ class TeacherCreate(_TeacherBase):
 
 # ----------------------------THEME-MODELS-----------------------------
 class ThemeCreate(_ThemeBase):
-    pass
+    subject_name: str
 
 
 class Theme(_ThemeBase):
     id: int
     teachers: List[_TeacherBase]
+    subject: _SubjectBase
+
+
+# ------------------------------SUBJECT-MODELS---------------------------
+class SubjectCreate(_SubjectBase):
+    themes: List[_ThemeBase]
+
+
+class Subject(_SubjectBase):
+    themes: List[_ThemeBase]
