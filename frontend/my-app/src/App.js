@@ -4,7 +4,8 @@ import {Navbar} from './components/Navbar';
 import { Registration } from './components/Registration';
 import {Route, Routes} from 'react-router-dom';
 import { Homepage } from './components/Homepage';
-import { Subjects } from './components/Subjects'
+import Subjects from './components/Subjects';
+import {Themes} from './components/Themes'
 
 export function App() {
   return (
@@ -15,6 +16,7 @@ export function App() {
       <Route path='/registration' element={<Registration />} />
       <Route path='/' element={<Homepage />} />
       <Route path='/subjects' element={<Subjects />} />
+      <Route path='/subjects/:subjectId' element={<Themes />} />
     </Routes>
     </>
   );

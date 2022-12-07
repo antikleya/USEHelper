@@ -66,7 +66,7 @@ export const Registration = () => {
         const requestOptions = {
             method: "POST",
             headers: {"Content-Type" : "application/json"},
-            body: JSON.stringify({email: email, hashed_password: password}) ,
+            body: JSON.stringify({email: email, name: "", hashed_password: password}) ,
         };
         const response = await fetch("/api/users", requestOptions);
         const data = await response.json()
