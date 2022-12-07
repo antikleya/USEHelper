@@ -199,7 +199,7 @@ async def update_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session,
 
 # ----------------------------SUBJECT-FUNCTIONS-------------------------------
 async def get_subject_by_name(subject_name: str, db: _orm.Session):
-    return db.query(_schemas.Subject).filter_by(name=subject_name).first()
+    return db.query(_models.Subject).filter_by(name=subject_name).first()
 
 
 async def _subject_selector(subject_id: int, db: _orm.Session):
@@ -226,7 +226,7 @@ async def create_subject(subject: _schemas.SubjectCreate, db: _orm.Session):
 
     db.add(subject_obj)
     db.commit()
-    db.refresh(subject)
+    db.refresh(subject_obj)
 
     return subject_obj
 
