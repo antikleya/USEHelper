@@ -19,6 +19,10 @@ tags_metadata = [
         "name": "Teachers",
         "description": "Operations with Teachers",
     },
+    {
+        "name": "Themes",
+        "description": "Operations with Themes",
+    },
 ]
 
 app = _fastapi.FastAPI(openapi_tags=tags_metadata)
@@ -183,3 +187,63 @@ async def update_subject(
     await _services.update_subject(subject_id, db, current_user, subject)
 
     return {"message", "Updated Successfully"}
+
+
+# ----------------------------------THEME-API-------------------------------
+@app.post('/api/subjects/{subject_id}/themes', tags=["Themes"])
+async def create_theme(
+        subject_id: int,
+        theme: _schemas.ThemeCreate,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    theme_db = await _services.get_theme_by_name(theme.name, db)
+
+    if theme_db:
+        raise _fastapi.HTTPException(status_code=400, detail='This theme already exists')
+
+    theme = await create_theme(subject_id, theme, db, current_user)
+
+    return _schemas.Theme.from_orm(theme)
+
+
+@app.get('/api/subjects/{subject_id}/themes', tags=["Themes"], response_model=List[_schemas._ThemeBase])
+async def get_themes(
+        subject_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db)
+):
+    return await _services.get_themes(subject_id, db)
+
+
+@app.get('/api/subjects/{subject_id}/themes/{theme_id}', tags=["Themes"], status_code=200)
+async def get_theme(
+        subject_id: int,
+        theme_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+):
+    return await _services.get_theme(subject_id, theme_id, db)
+
+
+@app.put('/api/subjects/{subject_id}/themes/{theme_id}', tags=["Themes"], status_code=200)
+async def update_theme(
+        subject_id: int,
+        theme_id: int,
+        theme: _schemas.ThemeCreate,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    theme = await _services.update_theme(subject_id, theme_id, theme, db, current_user)
+
+    return theme
+
+
+@app.delete("/api/subjects/{subject_id}/themes/{theme_id}", tags=["Themes"], status_code=204)
+async def delete_theme(
+        subject_id: int,
+        theme_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    await _services.delete_theme(subject_id, theme_id, db, current_user)
+
+    return {"message", "Deleted Successfully"}

@@ -11,6 +11,16 @@ oauth2schema = _security.OAuth2PasswordBearer(tokenUrl="/api/token")
 JWT_SECRET = "string incedent"
 
 
+# ---------------------------MISC-----------------------------------
+def require_admin(func):
+    async def wrapped(current_user: _schemas.User, *args, **kwargs):
+        if not is_admin(current_user):
+            raise _fastapi.HTTPException(status_code=401, detail='Must be an admin to perform this action')
+
+        return await func(*args, **kwargs)
+
+    return wrapped
+
 # -----------------------DATABASE-FUNCTIONS-------------------------
 def create_database():
     return _database.Base.metadata.create_all(bind=_database.engine)
@@ -145,14 +155,9 @@ async def _teacher_selector(teacher_id: int, db: _orm.Session):
     return teacher
 
 
-async def _teacher_selector_change(teacher_id: int, db: _orm.Session, current_user: _schemas.User):
-    teacher = await _teacher_selector(teacher_id, db)
-    user = await get_user_by_email(current_user.email, db)
-
-    if not is_admin(_schemas.User.from_orm(user)):
-        raise _fastapi.HTTPException(status_code=401, detail='Must be an admin to perform this action')
-
-    return teacher
+@require_admin
+async def _teacher_selector_change(teacher_id: int, db: _orm.Session):
+    return await _teacher_selector(teacher_id, db)
 
 
 async def create_teacher(teacher: _schemas.TeacherCreate, db: _orm.Session):
@@ -178,14 +183,14 @@ async def get_teacher(teacher_id: int, db: _orm.Session):
 
 
 async def delete_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session):
-    teacher = _teacher_selector_change(teacher_id, db, user)
+    teacher = _teacher_selector_change(user, teacher_id, db)
 
     db.delete(teacher)
     db.commit()
 
 
 async def update_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session, teacher: _schemas.TeacherCreate):
-    old_teacher = _teacher_selector_change(teacher_id, db, user)
+    old_teacher = _teacher_selector_change(user, teacher_id, db)
 
     old_teacher.name = teacher.name
     old_teacher.phone_number = teacher.phone_number
@@ -202,6 +207,10 @@ async def get_subject_by_name(subject_name: str, db: _orm.Session):
     return db.query(_models.Subject).filter_by(name=subject_name).first()
 
 
+async def get_subject_by_id(subject_id: int, db: _orm.Session):
+    return db.query(_models.Subject).filter_by(id=subject_id).first()
+
+
 async def _subject_selector(subject_id: int, db: _orm.Session):
     subject = db.query(_models.Subject).filter_by(id=subject_id).first()
 
@@ -211,12 +220,9 @@ async def _subject_selector(subject_id: int, db: _orm.Session):
     return subject
 
 
-async def _subject_selector_change(subject_id: int, db: _orm.Session, current_user: _schemas.User):
+@require_admin
+async def _subject_selector_change(subject_id: int, db: _orm.Session):
     subject = await _subject_selector(subject_id, db)
-    user = await get_user_by_email(current_user.email, db)
-
-    if not is_admin(_schemas.User.from_orm(user)):
-        raise _fastapi.HTTPException(status_code=401, detail='Must be an admin to perform this action')
 
     return subject
 
@@ -244,14 +250,14 @@ async def get_subject(subject_id: int, db: _orm.Session):
 
 
 async def delete_subject(subject_id: int, db: _orm.Session, user: _schemas.User):
-    subject = await _subject_selector_change(subject_id, db, user)
+    subject = await _subject_selector_change(user, subject_id, db)
 
     db.delete(subject)
     db.commit()
 
 
 async def update_subject(subject_id: int, db: _orm.Session, user: _schemas.User, subject: _schemas.SubjectCreate):
-    old_subject = await _subject_selector_change(subject_id, db, user)
+    old_subject = await _subject_selector_change(user, subject_id, db)
 
     old_subject.name = subject.name
     old_subject.themes = subject.themes
@@ -261,3 +267,64 @@ async def update_subject(subject_id: int, db: _orm.Session, user: _schemas.User,
 
     return _schemas.Subject.from_orm(old_subject)
 
+
+# ----------------------------------THEME-FUNCTIONS--------------------------
+async def get_theme_by_name(theme_name, db: _orm.Session):
+    return db.query(_models.Theme).filter_by(name=theme_name).first()
+
+
+async def _theme_selector(subject_id: int, theme_id: int, db: _orm.Session):
+    theme = db.query(_models.Theme).filter_by(id=theme_id, subject_id=subject_id).first()
+
+    if theme is None:
+        raise _fastapi.HTTPException(status_code=404, detail='Theme does not exist')
+
+    return theme
+
+
+@require_admin
+async def _theme_selector_change(subject_id: int, theme_id: int, db: _orm.Session):
+    return await _theme_selector(subject_id, theme_id, db)
+
+
+async def create_theme(subject_id: int, db: _orm.Session, theme: _schemas.ThemeCreate, user: _schemas.User):
+    subject = await _subject_selector_change(user, subject_id, db)
+
+    theme_obj = _models.Theme(name=theme.name, description=theme.description, subject=subject, subject_id=subject.id)
+
+    db.add(theme_obj)
+    db.commit()
+    db.refresh(theme_obj)
+
+    return theme_obj
+
+
+async def get_themes(subject_id: int, db: _orm.Session):
+    subject = _schemas.Subject.from_orm(await _subject_selector(subject_id, db))
+
+    themes = subject.themes
+
+    return themes
+
+
+async def get_theme(subject_id: int, theme_id: int, db: _orm.Session):
+    return await _theme_selector(subject_id, theme_id, db)
+
+
+async def delete_theme(subject_id: int, theme_id: int, db: _orm.Session, current_user: _schemas.User):
+    theme = await _theme_selector_change(current_user, subject_id, theme_id, db)
+
+    db.delete(theme)
+    db.commit()
+
+
+async def update_theme(subject_id: int, theme_id: int, theme: _schemas.ThemeCreate, db: _orm.Session, current_user: _schemas.User):
+    old_theme = await _theme_selector_change(current_user, subject_id, theme_id, db)
+
+    old_theme.name = theme.name
+    old_theme.description = theme.description
+
+    db.commit()
+    db.refresh(old_theme)
+
+    return _schemas.Theme.from_orm(old_theme)

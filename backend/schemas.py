@@ -46,6 +46,15 @@ class _SubjectBase(_pydantic.BaseModel):
         orm_mode = True
 
 
+class _QuestionBase(_pydantic.BaseModel):
+    id: int
+    text: str
+    max_mark: int
+
+    class Config:
+        orm_mode = True
+
+
 # -----------------------USER-MODELS-----------------------------------
 class UserCreate(_UserBase):
     hashed_password: str
@@ -68,13 +77,14 @@ class TeacherCreate(_TeacherBase):
 
 # ----------------------------THEME-MODELS-----------------------------
 class ThemeCreate(_ThemeBase):
-    subject_name: str
+    pass
 
 
 class Theme(_ThemeBase):
     id: int
     teachers: List[_TeacherBase]
     subject: _SubjectBase
+    questions: List[_QuestionBase]
 
 
 # ------------------------------SUBJECT-MODELS---------------------------
