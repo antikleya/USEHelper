@@ -141,17 +141,14 @@ async def update_teacher(
 async def create_subject(
         subject: _schemas.SubjectCreate,
         db: _orm.Session = _fastapi.Depends(_services.get_db),
-#       user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+        user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    # if not _services.is_admin(user):
-    #     raise _fastapi.HTTPException(status_code=401, detail='Must be an admin to perform this action')
-
     subject_db = await _services.get_subject_by_name(subject.name, db)
 
     if subject_db:
         raise _fastapi.HTTPException(status_code=400, detail='This subject already exists')
 
-    subject = await _services.create_subject(subject, db)
+    subject = await _services.create_subject(user, subject, db)
 
     return _schemas.Subject.from_orm(subject)
 
@@ -247,3 +244,66 @@ async def delete_theme(
     await _services.delete_theme(subject_id, theme_id, db, current_user)
 
     return {"message", "Deleted Successfully"}
+
+
+# ----------------------------------------QUESTION-API------------------------------
+@app.get('/api/questions/{question_id}', tags=["Questions"], status_code=200)
+async def get_question(
+        question_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+):
+    return await _services.get_question(question_id, db)
+
+
+@app.get('/api/questions', tags=['Questions'], response_model=List[_schemas.Question])
+async def get_questions(db: _orm.Session = _fastapi.Depends(_services.get_db)):
+    return _services.get_questions(db)
+
+
+@app.post('/api/questions', tags=['Questions'])
+async def create_question(
+        question: _schemas.QuestionCreate,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    question_db = _services.get_question_by_text(question.text, db)
+
+    if question_db:
+        raise _fastapi.HTTPException(status_code=400, detail='Question already exists')
+
+    question = await _services.create_question(current_user, question, db)
+
+    return _schemas.Question.from_orm(question)
+
+
+@app.put('/api/questions/{question_id}', tags=['Questions'], status_code=200)
+async def update_question(
+        question_id: int,
+        question: _schemas.QuestionCreate,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    question = await _services.update_question(question_id, question, db, current_user)
+
+    return _schemas.Question.from_orm(question)
+
+
+@app.delete('/api/questions/{questions_id}', tags=['Questions'], status_code=204)
+async def delete_question(
+        question_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    await _services.delete_question(question_id, db, current_user)
+
+    return {"message", "Deleted Successfully"}
+
+
+# ----------------------------------------TEST-API------------------------------
+@app.get("/api/tests/{test_id}")
+async def get_test(
+        test_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    pass

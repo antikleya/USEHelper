@@ -55,6 +55,13 @@ class _QuestionBase(_pydantic.BaseModel):
         orm_mode = True
 
 
+class _TestBase(_pydantic.BaseModel):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 # -----------------------USER-MODELS-----------------------------------
 class UserCreate(_UserBase):
     hashed_password: str
@@ -94,3 +101,17 @@ class SubjectCreate(_SubjectBase):
 
 class Subject(_SubjectBase):
     themes: List[_ThemeBase]
+
+
+# --------------------------------TEST-MODELS-----------------------------
+class Test(_TestBase):
+    questions: List[_QuestionBase]
+
+
+# -------------------------------QUESTION-MODELS-------------------------
+class QuestionCreate(_QuestionBase):
+    answer: str
+
+
+class Question(_QuestionBase):
+    pass

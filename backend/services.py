@@ -160,6 +160,7 @@ async def _teacher_selector_change(teacher_id: int, db: _orm.Session):
     return await _teacher_selector(teacher_id, db)
 
 
+@require_admin
 async def create_teacher(teacher: _schemas.TeacherCreate, db: _orm.Session):
     teacher_obj = _models.Teacher(name=teacher.name, phone_number=teacher.phone_number)
 
@@ -227,6 +228,7 @@ async def _subject_selector_change(subject_id: int, db: _orm.Session):
     return subject
 
 
+@require_admin
 async def create_subject(subject: _schemas.SubjectCreate, db: _orm.Session):
     subject_obj = _models.Subject(name=subject.name)
 
@@ -318,7 +320,13 @@ async def delete_theme(subject_id: int, theme_id: int, db: _orm.Session, current
     db.commit()
 
 
-async def update_theme(subject_id: int, theme_id: int, theme: _schemas.ThemeCreate, db: _orm.Session, current_user: _schemas.User):
+async def update_theme(
+        subject_id: int,
+        theme_id: int,
+        theme: _schemas.ThemeCreate,
+        db: _orm.Session,
+        current_user: _schemas.User
+):
     old_theme = await _theme_selector_change(current_user, subject_id, theme_id, db)
 
     old_theme.name = theme.name
@@ -328,3 +336,73 @@ async def update_theme(subject_id: int, theme_id: int, theme: _schemas.ThemeCrea
     db.refresh(old_theme)
 
     return _schemas.Theme.from_orm(old_theme)
+
+
+# ---------------------------------QUESTIONS-FUNCTIONS-----------------------------
+async def get_question_by_text(question_text: str, db: _orm.Session):
+    return db.query(_models.Question).filter_by(text=question_text).first()
+
+
+async def _question_selector(question_id: int, db: _orm.Session):
+    question = db.query(_models.Question).filter_by(id=question_id).first()
+
+    if question is None:
+        raise _fastapi.HTTPException(status_code=404, detail="Question does not exist")
+
+    return question
+
+
+@require_admin
+async def _question_selector_change(question_id: int, db: _orm.Session):
+    return await _question_selector(question_id, db)
+
+
+@require_admin
+async def create_question(question: _schemas.QuestionCreate, db: _orm.Session):
+    question_orm = _models.Question(text=question.text, max_mark=question.max_mark, answer=question.answer)
+
+    db.add(question_orm)
+    db.commit()
+    db.refresh(question_orm)
+
+    return question_orm
+
+
+async def get_question(question_id: int, db: _orm.Session):
+    return await _question_selector(question_id, db)
+
+
+async def get_questions(db: _orm.Session):
+    questions = db.query(_models.Question).all()
+
+    return list(map(_schemas.Question.from_orm, questions))
+
+
+async def update_question(
+        question_id: int,
+        question: _schemas.QuestionCreate,
+        db: _orm.Session,
+        current_user: _schemas.User
+):
+    old_question = await _question_selector_change(current_user, question_id, db)
+
+    old_question.text = question.text
+    old_question.max_mark = question.max_mark
+    old_question.answer = question.answer
+
+    db.commit()
+    db.refresh(old_question)
+
+    return old_question
+
+
+async def delete_question(
+        question_id: int,
+        db: _orm.Session,
+        current_user: _schemas.User
+):
+    question = await _question_selector_change(current_user, question_id, db)
+
+    db.delete(question)
+    db.commit()
+
