@@ -1,5 +1,5 @@
 import datetime as _dt
-from typing import List
+from typing import List, Tuple
 
 import pydantic as _pydantic
 
@@ -62,6 +62,14 @@ class _TestBase(_pydantic.BaseModel):
         orm_mode = True
 
 
+class _AnswerBase(_pydantic.BaseModel):
+    id: int
+    given_answer: str
+
+    class Config:
+        orm_mode = True
+
+
 # -----------------------USER-MODELS-----------------------------------
 class UserCreate(_UserBase):
     hashed_password: str
@@ -103,11 +111,6 @@ class Subject(_SubjectBase):
     themes: List[_ThemeBase]
 
 
-# --------------------------------TEST-MODELS-----------------------------
-class Test(_TestBase):
-    questions: List[_QuestionBase]
-
-
 # -------------------------------QUESTION-MODELS-------------------------
 class QuestionCreate(_QuestionBase):
     answer: str
@@ -115,3 +118,26 @@ class QuestionCreate(_QuestionBase):
 
 class Question(_QuestionBase):
     pass
+
+
+# --------------------------------ANSWER-MODELS---------------------------
+class Answer(_AnswerBase):
+    pass
+
+
+class AnswerComplete(_AnswerBase):
+    mark: int
+
+
+class AnswerCreate(_AnswerBase):
+    pass
+
+
+# --------------------------------TEST-MODELS-----------------------------
+class Test(_TestBase):
+    questions: List[_QuestionBase]
+
+
+class TestCompleted(Test):
+    answers = List[AnswerComplete]
+

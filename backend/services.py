@@ -1,10 +1,13 @@
 import database as _database
+import datetime as _dt
 import sqlalchemy.orm as _orm
 import models as _models, schemas as _schemas
 import passlib.hash as _hash
 import jwt as _jwt
 import fastapi as _fastapi
 import fastapi.security as _security
+from sqlalchemy.sql.functions import random as _random
+from typing import List
 
 oauth2schema = _security.OAuth2PasswordBearer(tokenUrl="/api/token")
 
@@ -20,6 +23,14 @@ def require_admin(func):
         return await func(*args, **kwargs)
 
     return wrapped
+
+
+def get_amounts(question_amount: int, theme_amount: int):
+    amount = question_amount // theme_amount
+    overhead = question_amount - theme_amount * amount
+    amounts = [amount + 1 if i < overhead else amount for i in range(theme_amount)]
+    return amounts
+
 
 # -----------------------DATABASE-FUNCTIONS-------------------------
 def create_database():
@@ -271,8 +282,8 @@ async def update_subject(subject_id: int, db: _orm.Session, user: _schemas.User,
 
 
 # ----------------------------------THEME-FUNCTIONS--------------------------
-async def get_theme_by_name(theme_name, db: _orm.Session):
-    return db.query(_models.Theme).filter_by(name=theme_name).first()
+async def get_theme_by_name(subject_id: int, theme_name: str, db: _orm.Session):
+    return db.query(_models.Theme).filter_by(name=theme_name, subject_id=subject_id).first()
 
 
 async def _theme_selector(subject_id: int, theme_id: int, db: _orm.Session):
@@ -339,8 +350,8 @@ async def update_theme(
 
 
 # ---------------------------------QUESTIONS-FUNCTIONS-----------------------------
-async def get_question_by_text(question_text: str, db: _orm.Session):
-    return db.query(_models.Question).filter_by(text=question_text).first()
+async def get_question_by_text(theme_id: int, question_text: str, db: _orm.Session):
+    return db.query(_models.Question).filter_by(theme_id=theme_id, text=question_text).first()
 
 
 async def _question_selector(question_id: int, db: _orm.Session):
@@ -358,8 +369,9 @@ async def _question_selector_change(question_id: int, db: _orm.Session):
 
 
 @require_admin
-async def create_question(question: _schemas.QuestionCreate, db: _orm.Session):
-    question_orm = _models.Question(text=question.text, max_mark=question.max_mark, answer=question.answer)
+async def create_question(theme_id: int, question: _schemas.QuestionCreate, db: _orm.Session):
+    question_orm = _models.Question(text=question.text, max_mark=question.max_mark, answer=question.answer,
+                                    theme_id=theme_id)
 
     db.add(question_orm)
     db.commit()
@@ -405,4 +417,126 @@ async def delete_question(
 
     db.delete(question)
     db.commit()
+
+
+async def get_random_questions_by_theme(theme: _models.Theme, amount: int, db: _orm.Session):
+    questions = db.query(_models.Question)\
+        .filter_by(theme_id=theme.id)\
+        .order_by(_random())\
+        .limit(amount)\
+        .all()
+    return questions
+
+
+# -------------------------------------ANSWER-FUNCTIONS-----------------------------
+async def answer_exists(test_id: int, question_id: int, db: _orm.Session):
+    answer = db.query(_models.Answer).filter_by(test_id=test_id, question_id=question_id).first()
+    if answer is None:
+        return False
+
+    return True
+
+
+async def _answer_selector(test_id: int, question_id: int, db: _orm.Session):
+    return db.query(_models.Answer).filter_by(test_id=test_id, question_id=question_id).first()
+
+
+async def get_mark(question_id: int, answer: _schemas.AnswerCreate, db: _orm.Session):
+    question = db.query(_models.Question).filter_by(id=question_id).first()
+
+    if question.max_mark == 1:
+        if question.answer == answer.given_answer:
+            return 1
+        else:
+            return 0
+
+    else:
+        answers = set(str(question.answer).split(', '))
+        given_answers = set(answer.given_answer.split(', '))
+
+        if len(given_answers) > len(answers):
+            mark = len(answers) - len(given_answers)
+        else:
+            mark = 0
+        mark += len(answers.intersection(given_answers))
+        return max(0, mark)
+
+
+async def create_answer(
+        test_id: int,
+        question_id: int,
+        answer: _schemas.AnswerCreate,
+        db: _orm.Session
+):
+    mark = await get_mark(question_id, answer, db)
+    answer_orm = _models.Answer(given_answer=answer.given_answer, mark=mark, question_id=question_id, test_id=test_id)
+
+    db.add(answer_orm)
+    db.commit()
+    db.refresh(answer_orm)
+
+    return _schemas.Answer.from_orm(answer_orm)
+
+
+async def update_answer(
+        test_id: int,
+        question_id: int,
+        answer: _schemas.AnswerCreate,
+        db: _orm.Session
+):
+    mark = await get_mark(question_id, answer, db)
+    old_answer = await _answer_selector(test_id, question_id, db)
+
+    old_answer.given_answer = answer.given_answer
+    old_answer.mark = mark
+
+    db.commit()
+    db.refresh(old_answer)
+
+    return _schemas.Answer.from_orm(old_answer)
+
+
+# --------------------------------------TEST-FUNCTIONS---------------------------------
+async def _test_selector(test_id: int, db: _orm.Session, user: _schemas.User):
+    test = db.query(_models.Test).filter_by(id=test_id, user_id=user.id)
+
+    if test is None:
+        raise _fastapi.HTTPException(status_code=404, detail="Test does no exist")
+
+    return test
+
+
+async def generate_test(subject_id: int, q: List[str], db: _orm.Session, current_user: _schemas.User):
+    themes = [await get_theme_by_name(subject_id, query, db) for query in q]
+
+    if None in themes:
+        raise _fastapi.HTTPException(status_code=401, detail="Incorrect theme name")
+
+    amounts = get_amounts(20, len(themes))
+
+    questions = []
+
+    for i, j in themes, amounts:
+        questions.extend(await get_random_questions_by_theme(i, i, db))
+
+    test = _models.Test(date=_dt.datetime.utcnow, user_id=current_user.id, questions=questions)
+
+    db.add(test)
+    db.commit()
+    db.refresh(test)
+
+    return test
+
+
+async def get_test(test_id: int, db: _orm.Session, current_user: _schemas.User):
+    return await _test_selector(test_id, db, current_user)
+
+
+async def get_test_answers(db: _orm.Session, current_user: _schemas.User):
+    tests = db.query(_models.Test).filter_by(user_id=current_user.id).all()
+
+    return tests
+
+
+
 

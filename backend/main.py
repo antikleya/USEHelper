@@ -23,6 +23,18 @@ tags_metadata = [
         "name": "Themes",
         "description": "Operations with Themes",
     },
+    {
+        "name": "Questions",
+        "description": "Operations with Themes",
+    },
+    {
+        "name": "Answers",
+        "description": "Operations with Themes",
+    },
+    {
+        "name": "Tests",
+        "description": "Operations with Themes",
+    },
 ]
 
 app = _fastapi.FastAPI(openapi_tags=tags_metadata)
@@ -194,7 +206,7 @@ async def create_theme(
         db: _orm.Session = _fastapi.Depends(_services.get_db),
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    theme_db = await _services.get_theme_by_name(theme.name, db)
+    theme_db = await _services.get_theme_by_name(subject_id, theme.name, db)
 
     if theme_db:
         raise _fastapi.HTTPException(status_code=400, detail='This theme already exists')
@@ -260,18 +272,19 @@ async def get_questions(db: _orm.Session = _fastapi.Depends(_services.get_db)):
     return _services.get_questions(db)
 
 
-@app.post('/api/questions', tags=['Questions'])
+@app.post('/api/themes/{theme_id}/questions', tags=['Questions'])
 async def create_question(
+        theme_id: int,
         question: _schemas.QuestionCreate,
         db: _orm.Session = _fastapi.Depends(_services.get_db),
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    question_db = _services.get_question_by_text(question.text, db)
+    question_db = _services.get_question_by_text(theme_id, question.text, db)
 
     if question_db:
         raise _fastapi.HTTPException(status_code=400, detail='Question already exists')
 
-    question = await _services.create_question(current_user, question, db)
+    question = await _services.create_question(current_user, theme_id, question, db)
 
     return _schemas.Question.from_orm(question)
 
@@ -299,11 +312,55 @@ async def delete_question(
     return {"message", "Deleted Successfully"}
 
 
+# ------------------------------------ANSWER-API------------------------------
+@app.post('/api/tests/{test_id}/questions/{questions_id}', tags=['Answers'], status_code=200)
+async def create_or_update_answer(
+        test_id: int,
+        question_id: int,
+        answer: _schemas.AnswerCreate,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+):
+    if await _services.answer_exists(test_id, question_id, db):
+        answer = await _services.update_answer(test_id, question_id, answer, db)
+    else:
+        answer = await _services.create_answer(test_id, question_id, answer, db)
+
+    return answer
+
+
 # ----------------------------------------TEST-API------------------------------
-@app.get("/api/tests/{test_id}")
+@app.get("/api/tests/{test_id}", tags=['Tests'])
 async def get_test(
         test_id: int,
         db: _orm.Session = _fastapi.Depends(_services.get_db),
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    pass
+    test = _services.get_test(test_id, db, current_user)
+
+    return _schemas.Test.from_orm(test)
+
+
+@app.get('/api/subjects/{subject_id}/tests', tags=['Tests'])
+async def generate_test(
+        subject_id: int,
+        q: List[str] = _fastapi.Query(default=[]),
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    test = await _services.generate_test(subject_id, q, db, current_user)
+
+    return _schemas.Test.from_orm(test)
+
+
+@app.get('/api/users/{user_id}/tests', tags=['Tests'], response_model=List[_schemas.TestCompleted])
+async def get_test_answers(
+        user_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    if user_id != current_user.id:
+        raise _fastapi.HTTPException(status_code=403, detail="Unable to view different users test answers")
+
+    tests = await _services.get_test_answers(db, current_user)
+
+    return list(map(_schemas.TestCompleted.from_orm, tests))
