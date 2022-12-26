@@ -46,7 +46,7 @@ def get_db():
 
 
 def fill_database(db: _orm.Session = next(get_db())):
-    roles = ["user", "teacher", "administrator"]
+    roles = ["user", "administrator"]
     for role in roles:
         role_model = _models.Role(name=role)
         db.add(role_model)
@@ -103,9 +103,10 @@ async def authenticate_user(email: str, password: str, db: _orm.Session):
 
 
 async def create_token(user: _models.User):
-    user_obj = _schemas.User.from_orm(user)
 
-    token = _jwt.encode(user_obj.dict(), JWT_SECRET)
+    data = {'name': user.name, 'email': user.email, 'password': user.hashed_password}
+
+    token = _jwt.encode(data, JWT_SECRET)
 
     return dict(access_token=token, token_type="bearer")
 
@@ -113,7 +114,7 @@ async def create_token(user: _models.User):
 async def get_current_user(db: _orm.Session = _fastapi.Depends(get_db), token: str = _fastapi.Depends(oauth2schema)):
     try:
         payload = _jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-        user = db.query(_models.User).get(payload["id"])
+        user = db.query(_models.User).get(payload["email"])
     except:
         raise _fastapi.HTTPException(status_code=401, detail="Invalid Credentials")
 

@@ -31,8 +31,8 @@ class _ThemeBase(_pydantic.BaseModel):
 
 
 class _RoleBase(_pydantic.BaseModel):
-    id: int
-    name: str
+    id: int = 1
+    name: str = 'user'
 
     class Config:
         orm_mode = True
@@ -76,8 +76,8 @@ class UserCreate(_UserBase):
 
 
 class User(_UserBase):
-    id: int
-    role: _RoleBase
+    id: int = 1
+    role: _RoleBase = _RoleBase()
 
 
 # ------------------------TEACHER-MODELS------------------------------
@@ -139,5 +139,5 @@ class Test(_TestBase):
 
 
 class TestCompleted(Test):
-    answers = List[AnswerComplete]
+    answers: List[AnswerComplete]
 

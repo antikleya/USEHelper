@@ -25,15 +25,15 @@ tags_metadata = [
     },
     {
         "name": "Questions",
-        "description": "Operations with Themes",
+        "description": "Operations with Questions",
     },
     {
         "name": "Answers",
-        "description": "Operations with Themes",
+        "description": "Operations with Answers",
     },
     {
         "name": "Tests",
-        "description": "Operations with Themes",
+        "description": "Operations with Tests",
     },
 ]
 
@@ -87,6 +87,19 @@ async def update_user(
 ):
     await _services.update_user(user_id, user, current_user, db)
     return {"message", "Updated Successfully"}
+
+
+@app.get('/api/users/{user_id}/tests', tags=['Users'], response_model=List[_schemas.TestCompleted])
+async def get_test_results(
+        user_id: int,
+        db: _orm.Session = _fastapi.Depends(_services.get_db),
+        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
+):
+    if user_id != current_user.id:
+        raise _fastapi.HTTPException(status_code=403, detail="Cannot view other user results")
+    tests = await _services.get_test_answers(db, current_user)
+
+    return list(map(_schemas.TestCompleted.from_orm, tests))
 
 
 # ------------------------LOGIN-API------------------------------
@@ -272,10 +285,10 @@ async def get_questions(db: _orm.Session = _fastapi.Depends(_services.get_db)):
     return _services.get_questions(db)
 
 
-@app.post('/api/themes/{theme_id}/questions', tags=['Questions'])
+@app.post('/api/questions/{theme_id}', tags=['Questions'])
 async def create_question(
-        theme_id: int,
         question: _schemas.QuestionCreate,
+        theme_id: int = _fastapi.Query(),
         db: _orm.Session = _fastapi.Depends(_services.get_db),
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
@@ -313,11 +326,11 @@ async def delete_question(
 
 
 # ------------------------------------ANSWER-API------------------------------
-@app.post('/api/tests/{test_id}/questions/{questions_id}', tags=['Answers'], status_code=200)
+@app.post('/api/subjects/{subject_id}/tests/{test_id}/', tags=['Answers'], status_code=200)
 async def create_or_update_answer(
         test_id: int,
-        question_id: int,
         answer: _schemas.AnswerCreate,
+        question_id: int = _fastapi.Query(),
         db: _orm.Session = _fastapi.Depends(_services.get_db),
 ):
     if await _services.answer_exists(test_id, question_id, db):
@@ -329,7 +342,7 @@ async def create_or_update_answer(
 
 
 # ----------------------------------------TEST-API------------------------------
-@app.get("/api/tests/{test_id}", tags=['Tests'])
+@app.get("/api/subjects/{subject_id}/tests/{test_id}", tags=['Tests'])
 async def get_test(
         test_id: int,
         db: _orm.Session = _fastapi.Depends(_services.get_db),
@@ -350,17 +363,3 @@ async def generate_test(
     test = await _services.generate_test(subject_id, q, db, current_user)
 
     return _schemas.Test.from_orm(test)
-
-
-@app.get('/api/users/{user_id}/tests', tags=['Tests'], response_model=List[_schemas.TestCompleted])
-async def get_test_answers(
-        user_id: int,
-        db: _orm.Session = _fastapi.Depends(_services.get_db),
-        current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
-):
-    if user_id != current_user.id:
-        raise _fastapi.HTTPException(status_code=403, detail="Unable to view different users test answers")
-
-    tests = await _services.get_test_answers(db, current_user)
-
-    return list(map(_schemas.TestCompleted.from_orm, tests))
