@@ -32,30 +32,43 @@ def get_amounts(question_amount: int, theme_amount: int):
     return amounts
 
 
+async def get_worst_themes(tests: List[_models.Test], db: _orm.Session):
+    result = {}
+
+    for test in tests:
+
+        for (answer, question) in zip(test.answers, test.questions):
+            theme = db.query(_models.Theme).filter_by(id=question.theme_id).first()
+
+            mark = answer.mark / question.max_mark
+
+            if theme.name in result.keys():
+                amount = result[theme.name][1]
+                summ = result[theme.name][0]
+                result[theme.name] = (summ + mark, amount + 1)
+            else:
+                result[theme.name] = (mark, 1)
+
+    for key in result.keys():
+        result[key] = result[key][0] / result[key][1]
+
+    result = list(sorted(result.items(), key=lambda item: item[1]))
+
+    if len(result) > 3:
+        result = result[:3]
+
+    result = [x[0] for x in result]
+
+    return result
+
+
 # -----------------------DATABASE-FUNCTIONS-------------------------
-def create_database():
-    return _database.Base.metadata.create_all(bind=_database.engine)
-
-
 def get_db():
     db = _database.SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-def fill_database(db: _orm.Session = next(get_db())):
-    roles = ["user", "administrator"]
-    for role in roles:
-        role_model = _models.Role(name=role)
-        db.add(role_model)
-        db.commit()
-
-    admin_model = _models.User(email="admin@mail.ru", name="admin",
-                               hashed_password=_hash.bcrypt.hash("admin"), role_id=2)
-    db.add(admin_model)
-    db.commit()
 
 
 # ------------------------USER-AND-LOGIN-FUNCTIONS-------------------------------
@@ -234,6 +247,24 @@ async def update_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session,
     db.refresh(old_teacher)
 
     return _schemas.Teacher.from_orm(old_teacher)
+
+
+async def get_teacher_recommendations(tests: List[_models.Test], db: _orm.Session):
+    theme_names = await get_worst_themes(tests, db)
+
+    print("-----------------------------------------", theme_names)
+
+    teachers = db.query(_models.Teacher)
+
+    for theme_name in theme_names:
+        teachers = teachers.filter(_models.Teacher.themes.any(_models.Theme.name == theme_name))
+
+    teachers = teachers.all()
+
+    teachers = teachers if len(teachers) <= 3 else teachers[:3]
+
+    return teachers
+
 
 
 # ----------------------------SUBJECT-FUNCTIONS-------------------------------

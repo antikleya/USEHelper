@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import fastapi as _fastapi
 import fastapi.security as _security
 
@@ -89,7 +89,8 @@ async def update_user(
     return {"message": "Updated Successfully"}
 
 
-@app.get('/api/users/{user_id}/tests', tags=['Users'], response_model=List[_schemas.TestCompleted])
+@app.get('/api/users/{user_id}/tests', tags=['Users'],
+         response_model=Tuple[List[_schemas.TestCompleted], List[_schemas.Teacher]])
 async def get_test_results(
         user_id: int,
         db: _orm.Session = _fastapi.Depends(_services.get_db),
@@ -97,9 +98,14 @@ async def get_test_results(
 ):
     if user_id != current_user.id:
         raise _fastapi.HTTPException(status_code=403, detail="Cannot view other user results")
-    tests = await _services.get_test_answers(db, current_user)
 
-    return list(map(_schemas.TestCompleted.from_orm, tests))
+    tests = await _services.get_test_answers(db, current_user)
+    test_schemas = list(map(_schemas.TestCompleted.from_orm, tests))
+
+    teachers = await _services.get_teacher_recommendations(tests, db)
+    teachers = list(map(_schemas.Teacher.from_orm, teachers))
+
+    return test_schemas, teachers
 
 
 # ------------------------LOGIN-API------------------------------
