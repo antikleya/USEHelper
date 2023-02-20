@@ -252,8 +252,6 @@ async def update_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session,
 async def get_teacher_recommendations(tests: List[_models.Test], db: _orm.Session):
     theme_names = await get_worst_themes(tests, db)
 
-    print("-----------------------------------------", theme_names)
-
     teachers = db.query(_models.Teacher)
 
     for theme_name in theme_names:
@@ -264,7 +262,6 @@ async def get_teacher_recommendations(tests: List[_models.Test], db: _orm.Sessio
     teachers = teachers if len(teachers) <= 3 else teachers[:3]
 
     return teachers
-
 
 
 # ----------------------------SUBJECT-FUNCTIONS-------------------------------
@@ -608,7 +605,3 @@ async def get_test_answers(db: _orm.Session, current_user: _schemas.User):
     tests = db.query(_models.Test).filter_by(user_id=current_user.id).all()
 
     return tests
-
-
-
-
