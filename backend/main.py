@@ -75,7 +75,7 @@ async def delete_user(
 ):
     await _services.delete_user(user_id, current_user, db)
 
-    return {"message", "Deleted Successfully"}
+    return {"message": "Deleted Successfully"}
 
 
 @app.put('/api/users/{user_id}', tags=["Users"], status_code=200)
@@ -86,7 +86,7 @@ async def update_user(
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
     await _services.update_user(user_id, user, current_user, db)
-    return {"message", "Updated Successfully"}
+    return {"message": "Updated Successfully"}
 
 
 @app.get('/api/users/{user_id}/tests', tags=['Users'], response_model=List[_schemas.TestCompleted])
@@ -118,12 +118,14 @@ async def generate_token(
 
 # -------------------------Teacher-API----------------------------
 @app.post("/api/teachers", tags=["Teachers"])
-async def create_teacher(teacher: _schemas.TeacherCreate, db: _orm.Session = _fastapi.Depends(_services.get_db)):
+async def create_teacher(teacher: _schemas.TeacherCreate,
+                         db: _orm.Session = _fastapi.Depends(_services.get_db),
+                         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)):
     teacher_db = await _services.get_teacher_by_phone(teacher.phone_number, db)
     if teacher_db:
         raise _fastapi.HTTPException(status_code=400, detail='This phone number is already in use')
 
-    teacher = await _services.create_teacher(teacher, db)
+    teacher = await _services.create_teacher(current_user, teacher, db)
 
     return _schemas.Teacher.from_orm(teacher)
 
@@ -146,7 +148,7 @@ async def delete_teacher(
 ):
     await _services.delete_teacher(teacher_id, current_user, db)
 
-    return {"message", "Deleted Successfully"}
+    return {"message": "Deleted Successfully"}
 
 
 @app.put("/api/teachers/{teacher_id}", tags=["Teachers"], status_code=200)
@@ -158,7 +160,7 @@ async def update_teacher(
 ):
     await _services.update_teacher(teacher_id, current_user, db, teacher)
 
-    return {"message", "Updated Successfully"}
+    return {"message": "Updated Successfully"}
 
 
 # --------------------------------------SUBJECT-API----------------------
@@ -196,7 +198,7 @@ async def delete_subject(
 ):
     await _services.delete_subject(subject_id, db, current_user)
 
-    return {"message", "Deleted Successfully"}
+    return {"message": "Deleted Successfully"}
 
 
 @app.put("/api/subjects/{subject_id}", tags=["Subjects"], status_code=200)
@@ -208,7 +210,7 @@ async def update_subject(
 ):
     await _services.update_subject(subject_id, db, current_user, subject)
 
-    return {"message", "Updated Successfully"}
+    return {"message": "Updated Successfully"}
 
 
 # ----------------------------------THEME-API-------------------------------
@@ -224,7 +226,7 @@ async def create_theme(
     if theme_db:
         raise _fastapi.HTTPException(status_code=400, detail='This theme already exists')
 
-    theme = await create_theme(subject_id, theme, db, current_user)
+    theme = await _services.create_theme(subject_id, db, theme, current_user)
 
     return _schemas.Theme.from_orm(theme)
 
@@ -268,21 +270,22 @@ async def delete_theme(
 ):
     await _services.delete_theme(subject_id, theme_id, db, current_user)
 
-    return {"message", "Deleted Successfully"}
+    return {"message": "Deleted Successfully"}
 
 
 # ----------------------------------------QUESTION-API------------------------------
-@app.get('/api/questions/{question_id}', tags=["Questions"], status_code=200)
+@app.get('/api/questions/{question_id}', tags=["Questions"], status_code=200, response_model=_schemas.Question)
 async def get_question(
         question_id: int,
         db: _orm.Session = _fastapi.Depends(_services.get_db),
 ):
-    return await _services.get_question(question_id, db)
+    question = await _services.get_question(question_id, db)
+    return _schemas.Question.from_orm(question)
 
 
 @app.get('/api/questions', tags=['Questions'], response_model=List[_schemas.Question])
 async def get_questions(db: _orm.Session = _fastapi.Depends(_services.get_db)):
-    return _services.get_questions(db)
+    return await _services.get_questions(db)
 
 
 @app.post('/api/questions/{theme_id}', tags=['Questions'])
@@ -292,7 +295,7 @@ async def create_question(
         db: _orm.Session = _fastapi.Depends(_services.get_db),
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    question_db = _services.get_question_by_text(theme_id, question.text, db)
+    question_db = await _services.get_question_by_text(theme_id, question.text, db)
 
     if question_db:
         raise _fastapi.HTTPException(status_code=400, detail='Question already exists')
@@ -322,7 +325,7 @@ async def delete_question(
 ):
     await _services.delete_question(question_id, db, current_user)
 
-    return {"message", "Deleted Successfully"}
+    return {"message": "Deleted Successfully"}
 
 
 # ------------------------------------ANSWER-API------------------------------
@@ -348,7 +351,7 @@ async def get_test(
         db: _orm.Session = _fastapi.Depends(_services.get_db),
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    test = _services.get_test(test_id, db, current_user)
+    test = await _services.get_test(test_id, db, current_user)
 
     return _schemas.Test.from_orm(test)
 
@@ -356,10 +359,13 @@ async def get_test(
 @app.get('/api/subjects/{subject_id}/tests', tags=['Tests'])
 async def generate_test(
         subject_id: int,
-        q: List[str] = _fastapi.Query(default=[]),
+        theme_names: List[str] = _fastapi.Query(default=[]),
         db: _orm.Session = _fastapi.Depends(_services.get_db),
         current_user: _schemas.User = _fastapi.Depends(_services.get_current_user)
 ):
-    test = await _services.generate_test(subject_id, q, db, current_user)
+    if not theme_names:
+        raise _fastapi.HTTPException(status_code=400, detail='No theme names given')
+
+    test = await _services.generate_test(subject_id, theme_names, db, current_user)
 
     return _schemas.Test.from_orm(test)

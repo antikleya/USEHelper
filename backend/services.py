@@ -52,6 +52,11 @@ def fill_database(db: _orm.Session = next(get_db())):
         db.add(role_model)
         db.commit()
 
+    admin_model = _models.User(email="admin@mail.ru", name="admin",
+                               hashed_password=_hash.bcrypt.hash("admin"), role_id=2)
+    db.add(admin_model)
+    db.commit()
+
 
 # ------------------------USER-AND-LOGIN-FUNCTIONS-------------------------------
 async def get_user_by_email(email: str, db: _orm.Session):
@@ -76,8 +81,9 @@ async def _user_selector_change(user_id, db: _orm.Session, current_user: _schema
     return user
 
 
-def is_admin(user: _schemas.User):
-    return user.role.name == 'administrator'
+def is_admin(user: _schemas.User, db: _orm.Session = next(get_db())):
+    user_db = db.query(_models.User).filter_by(email=user.email).first()
+    return user_db.role.name == 'administrator'
 
 
 async def create_user(user: _schemas.UserCreate, db: _orm.Session):
@@ -114,7 +120,7 @@ async def create_token(user: _models.User):
 async def get_current_user(db: _orm.Session = _fastapi.Depends(get_db), token: str = _fastapi.Depends(oauth2schema)):
     try:
         payload = _jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-        user = db.query(_models.User).get(payload["email"])
+        user = db.query(_models.User).filter_by(email=payload["email"]).first()
     except:
         raise _fastapi.HTTPException(status_code=401, detail="Invalid Credentials")
 
@@ -167,6 +173,16 @@ async def _teacher_selector(teacher_id: int, db: _orm.Session):
     return teacher
 
 
+async def _get_teacher_themes(theme_ids: List[int], db: _orm.Session):
+    themes = []
+
+    for theme_id in theme_ids:
+        theme = await _simple_theme_selector(theme_id, db)
+        themes.append(theme)
+
+    return themes
+
+
 @require_admin
 async def _teacher_selector_change(teacher_id: int, db: _orm.Session):
     return await _teacher_selector(teacher_id, db)
@@ -175,6 +191,9 @@ async def _teacher_selector_change(teacher_id: int, db: _orm.Session):
 @require_admin
 async def create_teacher(teacher: _schemas.TeacherCreate, db: _orm.Session):
     teacher_obj = _models.Teacher(name=teacher.name, phone_number=teacher.phone_number)
+
+    themes = await _get_teacher_themes(teacher.theme_ids, db)
+    teacher_obj.themes = themes
 
     db.add(teacher_obj)
     db.commit()
@@ -196,18 +215,20 @@ async def get_teacher(teacher_id: int, db: _orm.Session):
 
 
 async def delete_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session):
-    teacher = _teacher_selector_change(user, teacher_id, db)
+    teacher = await _teacher_selector_change(user, teacher_id, db)
 
     db.delete(teacher)
     db.commit()
 
 
 async def update_teacher(teacher_id: int, user: _schemas.User, db: _orm.Session, teacher: _schemas.TeacherCreate):
-    old_teacher = _teacher_selector_change(user, teacher_id, db)
+    old_teacher = await _teacher_selector_change(user, teacher_id, db)
 
     old_teacher.name = teacher.name
     old_teacher.phone_number = teacher.phone_number
-    old_teacher.themes = teacher.themes
+
+    themes = await _get_teacher_themes(teacher.theme_ids, db)
+    old_teacher.themes = themes
 
     db.commit()
     db.refresh(old_teacher)
@@ -274,7 +295,6 @@ async def update_subject(subject_id: int, db: _orm.Session, user: _schemas.User,
     old_subject = await _subject_selector_change(user, subject_id, db)
 
     old_subject.name = subject.name
-    old_subject.themes = subject.themes
 
     db.commit()
     db.refresh(old_subject)
@@ -289,6 +309,15 @@ async def get_theme_by_name(subject_id: int, theme_name: str, db: _orm.Session):
 
 async def _theme_selector(subject_id: int, theme_id: int, db: _orm.Session):
     theme = db.query(_models.Theme).filter_by(id=theme_id, subject_id=subject_id).first()
+
+    if theme is None:
+        raise _fastapi.HTTPException(status_code=404, detail='Theme does not exist')
+
+    return theme
+
+
+async def _simple_theme_selector(theme_id: int, db: _orm.Session):
+    theme = db.query(_models.Theme).filter_by(id=theme_id).first()
 
     if theme is None:
         raise _fastapi.HTTPException(status_code=404, detail='Theme does not exist')
@@ -452,8 +481,8 @@ async def get_mark(question_id: int, answer: _schemas.AnswerCreate, db: _orm.Ses
             return 0
 
     else:
-        answers = set(str(question.answer).split(', '))
-        given_answers = set(answer.given_answer.split(', '))
+        answers = set(str(question.answer).split('; '))
+        given_answers = set(answer.given_answer.split('; '))
 
         if len(given_answers) > len(answers):
             mark = len(answers) - len(given_answers)
@@ -499,7 +528,7 @@ async def update_answer(
 
 # --------------------------------------TEST-FUNCTIONS---------------------------------
 async def _test_selector(test_id: int, db: _orm.Session, user: _schemas.User):
-    test = db.query(_models.Test).filter_by(id=test_id, user_id=user.id)
+    test = db.query(_models.Test).filter_by(id=test_id, user_id=user.id).first()
 
     if test is None:
         raise _fastapi.HTTPException(status_code=404, detail="Test does no exist")
@@ -507,8 +536,17 @@ async def _test_selector(test_id: int, db: _orm.Session, user: _schemas.User):
     return test
 
 
-async def generate_test(subject_id: int, q: List[str], db: _orm.Session, current_user: _schemas.User):
-    themes = [await get_theme_by_name(subject_id, query, db) for query in q]
+async def _get_test_themes(subject_id: int, theme_names: List[str], db: _orm.Session):
+    themes = []
+
+    for theme_name in theme_names:
+        themes.append(await get_theme_by_name(subject_id, theme_name, db))
+
+    return themes
+
+
+async def generate_test(subject_id: int, theme_names: List[str], db: _orm.Session, current_user: _schemas.User):
+    themes = await _get_test_themes(subject_id, theme_names, db)
 
     if None in themes:
         raise _fastapi.HTTPException(status_code=401, detail="Incorrect theme name")
@@ -517,10 +555,12 @@ async def generate_test(subject_id: int, q: List[str], db: _orm.Session, current
 
     questions = []
 
-    for i, j in themes, amounts:
-        questions.extend(await get_random_questions_by_theme(i, i, db))
+    for (i, j) in zip(themes, amounts):
+        questions.extend(await get_random_questions_by_theme(i, j, db))
 
-    test = _models.Test(date=_dt.datetime.utcnow, user_id=current_user.id, questions=questions)
+    test = _models.Test(date=_dt.datetime.utcnow(), user_id=current_user.id)
+
+    test.questions = questions
 
     db.add(test)
     db.commit()

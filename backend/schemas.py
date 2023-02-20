@@ -76,8 +76,8 @@ class UserCreate(_UserBase):
 
 
 class User(_UserBase):
-    id: int = 1
-    role: _RoleBase = _RoleBase()
+    id: int
+    role_id: int
 
 
 # ------------------------TEACHER-MODELS------------------------------
@@ -87,7 +87,7 @@ class Teacher(_TeacherBase):
 
 
 class TeacherCreate(_TeacherBase):
-    themes: List[_ThemeBase]
+    theme_ids: List[int]
 
 
 # ----------------------------THEME-MODELS-----------------------------
@@ -104,7 +104,7 @@ class Theme(_ThemeBase):
 
 # ------------------------------SUBJECT-MODELS---------------------------
 class SubjectCreate(_SubjectBase):
-    themes: List[_ThemeBase]
+    pass
 
 
 class Subject(_SubjectBase):
@@ -117,7 +117,7 @@ class QuestionCreate(_QuestionBase):
 
 
 class Question(_QuestionBase):
-    pass
+    theme: _ThemeBase
 
 
 # --------------------------------ANSWER-MODELS---------------------------
